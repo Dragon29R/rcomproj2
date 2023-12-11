@@ -10,7 +10,7 @@ struct Resources {
     char file[MAX_SIZE];
     char resource[MAX_SIZE];
     char host[MAX_SIZE];
-    char ip[MAX_SIZE];
+    char path[MAX_SIZE];
 };
 
 typedef enum{

@@ -11,23 +11,55 @@
 
 #include <string.h>
 #include "project.h"
+int parser(char* ftp_url , struct Resources* r){
+    CURLU *url;
+    CURLUcode url_code;
+
+    // Initialize the URL handle
+    url = curl_url();
+    if (!url) {
+        fprintf(stderr, "Error initializing URL handle\n");
+        return 1;
+    }
+
+    // Parse the URL
+    url_code = curl_url_set(url, CURLUPART_URL, ftp_url, 0);
+    if (url_code != CURLUE_OK) {
+        fprintf(stderr, "Error parsing URL: %s\n", curl_easy_strerror(url_code));
+        curl_url_cleanup(url);
+        return 1;
+    }
+
+    // Extract components
+    char *user, *password, *host, *path;
+    curl_url_get(url, CURLUPART_USER, &user, 0);
+    curl_url_get(url, CURLUPART_PASSWORD, &password, 0);
+    curl_url_get(url, CURLUPART_HOST, &host, 0);
+    curl_url_get(url, CURLUPART_PATH, &path, 0);
+
+    // Print components
+    printf("User: %s\n", user ? user : "N/A");
+    printf("Password: %s\n", password ? password : "N/A");
+    printf("Host: %s\n", host ? host : "N/A");
+    printf("Path: %s\n", path ? path : "N/A");
+
+    // Cleanup
+    strcpy(r->user_name , user ? user : "rcom");
+    strcpy(r->password, password ? password : "rcom");
+    strcpy(r->host, host ? host : "ftp.up.pt");
+    char* temp = strrchr(path, '/');
+    temp++;
+    strcpy(r->resource, temp);	
+    strcpy(r->path, path);
+    curl_free(user);
+    curl_free(password);
+    curl_free(host);
+    curl_free(path);
+    curl_url_cleanup(url);
+}
+
 int get_ip(char *hostname, char **ip) {
     struct hostent *h;
-
-/**
- * The struct hostent (host entry) with its terms documented
-
-    struct hostent {
-        char *h_name;    // Official name of the host.
-        char **h_aliases;    // A NULL-terminated array of alternate names for the host.
-        int h_addrtype;    // The type of address being returned; usually AF_INET.
-        int h_length;    // The length of the address in bytes.
-        char **h_addr_list;    // A zero-terminated array of network addresses for the host.
-        // Host addresses are in Network Byte Order.
-    };
-
-    #define h_addr h_addr_list[0]	The first address in h_addr_list.
-*/
     if ((h = gethostbyname(hostname)) == NULL) {
         herror("gethostbyname()");
         exit(-1);
@@ -151,6 +183,7 @@ int file_comand(int socket , char* file){
     return result;
 }
 int file_transfer(int socket, char* file){
+    printf("File: %s\n", file);
     FILE* fp = fopen(file, "w");
     char* buffer = malloc(MAX_SIZE*sizeof(char));
     int bytes;
@@ -178,13 +211,14 @@ int closeApp(int socketA, int socketB){
 }
 int main(int argc, char *argv[]) {
     struct Resources resource;
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <address to get IP address>\n", argv[0]);
-        exit(-1);
+    if(argc != 2){
+        printf("Usage: %s <ftp url>\n", argv[0]);
+        return -1;
     }
+    parser(argv[1], &resource);
     char* ip = malloc(16);
     memset(ip,0,16);
-    if(get_ip(argv[1],&ip) < 0) {
+    if(get_ip(resource.host,&ip) < 0) {
         perror("get_ip()");
         exit(-1);
     }
@@ -194,7 +228,7 @@ int main(int argc, char *argv[]) {
     if(get_response(sockfd, &response) != SERVER_READY){
         return -1;
     }
-    if(Auth(sockfd, "rcom", "rcom") != 0){
+    if(Auth(sockfd, resource.user_name, resource.password) != 0){
         printf("Auth failed\n");
         return -1;
     }
@@ -203,11 +237,12 @@ int main(int argc, char *argv[]) {
     int port;
     passiveMode(sockfd, &ip, &port);
     int sockfd2 = create_socket(ip, port);
-    if(file_comand(sockfd, "pipe.txt")!= SV_READY_FOR_DOWNLOAD){
+    if(file_comand(sockfd, resource.path)!= SV_READY_FOR_DOWNLOAD){
         printf("Error fetching file\n");
         return -1;
     }
-    if(file_transfer(sockfd2, "pipe.txt") != 0){
+    printf("Response: %s\n", resource.resource);
+    if(file_transfer(sockfd2, resource.resource) != 0){
         printf("Error fetching file\n");
         return -1;
     }
