@@ -222,7 +222,6 @@ int main(int argc, char *argv[]) {
         perror("get_ip()");
         exit(-1);
     }
-    printf("Ip: %s\n", ip);
     int sockfd = create_socket(ip, 21);
     char* response = malloc(MAX_SIZE*sizeof(char));
     if(get_response(sockfd, &response) != SERVER_READY){
@@ -232,7 +231,6 @@ int main(int argc, char *argv[]) {
         printf("Auth failed\n");
         return -1;
     }
-    printf("Response: %s\n", response);
     //free(ip);
     int port;
     passiveMode(sockfd, &ip, &port);
@@ -250,5 +248,6 @@ int main(int argc, char *argv[]) {
         printf("Error closing connection\n");
         return -1;
     }
+    free(ip);
     return 0;
 }
