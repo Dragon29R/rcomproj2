@@ -1,12 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <netdb.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <curl/curl.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include <string.h>
 #include "project.h"
@@ -121,7 +122,62 @@ int Auth(int sockfd, char* username, char* password){
     free(response);
     return 0;
 }
+int passiveMode(int sockfd, char** ip, int*port){
+    write(sockfd, "PASV\n", 5);
+    char* response = malloc(MAX_SIZE*sizeof(char));
+    int ip1, ip2, ip3, ip4, port_high, port_low;
+    if(get_response(sockfd, &response) != PASSIVE_MODE_OK){
+        return -1;
+
+    }
+    printf("Response: %s\n", response);
+    sscanf(response, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d).", &ip1, &ip2, &ip3, &ip4, &port_high, &port_low);
+    sprintf(*ip, "%d.%d.%d.%d", ip1, ip2, ip3, ip4);
+    *port = port_high * 256 + port_low;
+    printf("Ip: %s\n", *ip);
+    printf("Port: %d\n", *port);
+    free(response);
+}
+int file_comand(int socket , char* file){
+    char* response = malloc(MAX_SIZE*sizeof(char));
+    char* message = malloc(MAX_SIZE*sizeof(char));
+    sprintf(message, "RETR %s\n", file);
+    if(send_message(socket, message)!= 0){
+        return -1;
+    }
+    int result = get_response(socket,&response);
+    printf("Response: %s\n", response);
+    free(response);
+    return result;
+}
+int file_transfer(int socket, char* file){
+    FILE* fp = fopen(file, "w");
+    char* buffer = malloc(MAX_SIZE*sizeof(char));
+    int bytes;
+    while(1){
+        bytes = read(socket, buffer, MAX_SIZE);
+        if(bytes == 0)
+            break;
+        fwrite(buffer, sizeof(char), bytes, fp);
+    }
+    fclose(fp);
+    free(buffer);
+    return 0;
+}
+int closeApp(int socketA, int socketB){
+    char* response = malloc(MAX_SIZE*sizeof(char));
+    send_message(socketA, "QUIT\n");
+    get_response(socketA,&response) ;
+    if(get_response(socketA,&response) !=221){
+        printf("Error closing connection\n");
+        return -1;
+    }
+    close(socketA);
+    close(socketB);
+    return 0;
+}
 int main(int argc, char *argv[]) {
+    struct Resources resource;
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <address to get IP address>\n", argv[0]);
         exit(-1);
@@ -138,10 +194,26 @@ int main(int argc, char *argv[]) {
     if(get_response(sockfd, &response) != SERVER_READY){
         return -1;
     }
-    if(Auth(sockfd, "rcom", "rcom") != LOGIN_OK){
+    if(Auth(sockfd, "rcom", "rcom") != 0){
+        printf("Auth failed\n");
         return -1;
     }
     printf("Response: %s\n", response);
     //free(ip);
+    int port;
+    passiveMode(sockfd, &ip, &port);
+    int sockfd2 = create_socket(ip, port);
+    if(file_comand(sockfd, "pipe.txt")!= SV_READY_FOR_DOWNLOAD){
+        printf("Error fetching file\n");
+        return -1;
+    }
+    if(file_transfer(sockfd2, "pipe.txt") != 0){
+        printf("Error fetching file\n");
+        return -1;
+    }
+    if(closeApp(sockfd, sockfd2) != 0){
+        printf("Error closing connection\n");
+        return -1;
+    }
     return 0;
 }
