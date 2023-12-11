@@ -84,7 +84,6 @@ int get_response(int sockfd, char **response) {
     int i = 0;
     while(1){
         read(sockfd, &byte, 1);
-        printf("%c", byte);
         if(byte == '\n')
             break;
         else if(i == MAX_SIZE){
@@ -102,6 +101,24 @@ int get_response(int sockfd, char **response) {
     return value;
 }
 int Auth(int sockfd, char* username, char* password){
+    char user_message[MAX_SIZE];
+    char pass_message[MAX_SIZE];
+    char* response = malloc(MAX_SIZE*sizeof(char));
+    sprintf(user_message, "USER %s\n", username);
+    if(send_message(sockfd, user_message)!= 0){
+        return -1;
+    }
+    if(get_response(sockfd,&response)!= USER_NAME_OK)
+        return -1;
+    printf("Response: %s\n", response);
+    sprintf(pass_message, "PASS %s\n", password);
+    if(send_message(sockfd, pass_message)!= 0){
+        return -1;
+    }
+    if(get_response(sockfd,&response)!= LOGIN_OK)
+        return -1;
+    printf("Response: %s\n", response);
+    free(response);
     return 0;
 }
 int main(int argc, char *argv[]) {
@@ -121,10 +138,10 @@ int main(int argc, char *argv[]) {
     if(get_response(sockfd, &response) != SERVER_READY){
         return -1;
     }
-    send_message(sockfd, "USER rcom\n");
-    printf( "Response %d\n",get_response(sockfd, &response));
-    send_message(sockfd, "PASS rcom\n");
-    printf( "Response %d\n",get_response(sockfd, &response));
+    if(Auth(sockfd, "rcom", "rcom") != LOGIN_OK){
+        return -1;
+    }
+    printf("Response: %s\n", response);
     //free(ip);
     return 0;
 }
