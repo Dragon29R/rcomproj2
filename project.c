@@ -248,6 +248,6 @@ int main(int argc, char *argv[]) {
         printf("Error closing connection\n");
         return -1;
     }
-    free(ip);
+
     return 0;
 }
