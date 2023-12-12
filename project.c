@@ -44,8 +44,8 @@ int parser(char* ftp_url , struct Resources* r){
     printf("Path: %s\n", path ? path : "N/A");
 
     // Cleanup
-    strcpy(r->user_name , user ? user : "rcom");
-    strcpy(r->password, password ? password : "rcom");
+    strcpy(r->user_name , user ? user : "anonymous");
+    strcpy(r->password, password ? password : "anonymous");
     strcpy(r->host, host ? host : "ftp.up.pt");
     char* temp = strrchr(path, '/');
     temp++;
